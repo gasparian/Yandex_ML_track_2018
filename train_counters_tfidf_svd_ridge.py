@@ -1,4 +1,6 @@
 import pickle
+import logging
+import os
 
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
@@ -9,6 +11,15 @@ from sklearn.model_selection import KFold
 import config
 from scripts import *
 
+path = config.path +'/data/'+os.path.basename(__file__)
+os.mkdir(path)
+from shutil import copyfile
+copyfile(config.path+'/config.py', path+'/config.py')
+
+logging.basicConfig(level=logging.DEBUG,
+    format='%(asctime)s:%(name)s:%(levelname)s:%(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[logging.FileHandler(path + '/train.log', mode='w')])
 
 train = pd.read_csv(config.path+'/data/train_modified.tsv', sep=' ', index_col=0)
 test = pd.read_csv(config.path+'/data/test_modified.tsv', sep=' ', index_col=0)
@@ -39,18 +50,18 @@ fold, cv_score = 0, 0
 models = {i:{'counter':counters_pipe, 'model':lr} for i in range(nfolds)}
 
 for train_index, test_index in cv.split(train):
-    print('make features...')
+    logging.info('make features...')
     models[fold]['counter'].fit(np.hstack([train[str(col)].loc[train_index] for col in config.text_cols]))
     train_data = np.hstack([models[fold]['counter'].transform(train[str(col)].loc[train_index]) for col in config.text_cols])
     test_data = np.hstack([models[fold]['counter'].transform(train[str(col)].loc[test_index]) for col in config.text_cols])
 
-    print(train_data.shape)
-    print(test_data.shape)
+    logging.info(train_data.shape)
+    logging.info(test_data.shape)
     
-    print('fitting model...')
-    models[fold]['model'].fit(train_data, train['target'].loc[train_index])
+    logging.info('fitting model...')
+    models[fold]['model'].fit(train_data, train['target'].loc[train_index]) 
 
-    print('make prediction...')
+    logging.info('make prediction...')
     prediction = make_prediction(train.loc[test_index], test_data, models[fold]['model'])
     
     score = 0
@@ -61,9 +72,9 @@ for train_index, test_index in cv.split(train):
     score *= 100000
     cv_score += score / nfolds
     
-    print('fold#%i: ndcg = %i' % (fold, int(score)))
+    logging.info('fold#%i: ndcg = %i' % (fold, int(score)))
     fold += 1
-print('averaged cv score: ndcg = %i' % (int(cv_score)))
+logging.info('averaged cv score: ndcg = %i' % (int(cv_score)))
 
 prediction = pd.DataFrame()
 prediction['context_id'] = test['0']
@@ -73,8 +84,8 @@ for fold in range(nfolds):
     hold_out_test_data = np.hstack([models[fold]['counter'].transform(test[str(col)]) for col in config.text_cols])
     prediction['rank'] += - models[fold]['model'].predict(hold_out_test_data) / nfolds
 prediction = prediction.sort_values(by=['context_id', 'rank'])
-prediction[['context_id', 'reply_id']].to_csv(config.path+'/data/sub_svd_counter_tfidf_ridge.tsv',header=None, index=False, sep=' ')
-prediction.to_csv(config.path+'/data/sub_rank_svd_counter_tfidf_ridge.tsv', sep=' ')
+prediction[['context_id', 'reply_id']].to_csv(path+'/sub_svd_counter_tfidf_ridge.tsv',header=None, index=False, sep=' ')
+prediction.to_csv(path+'/sub_rank_svd_counter_tfidf_ridge.tsv', sep=' ')
 
-pickle.dump(models, open(config.path+'/models/svd_tfidf_ridge.pickle.dat', 'wb'))
-print('submission saved!')
+pickle.dump(models, open(path+'/svd_tfidf_ridge.pickle.dat', 'wb'))
+logging.info('submission saved!')

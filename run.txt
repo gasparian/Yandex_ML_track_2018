@@ -1,0 +1,2 @@
+python3 train_word2vec_ridge.py
+python3 train_word2vec_lgbm.py
