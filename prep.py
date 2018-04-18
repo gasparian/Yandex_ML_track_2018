@@ -14,7 +14,7 @@ import config
 logging.basicConfig(level=logging.DEBUG,
     format='%(asctime)s:%(name)s:%(levelname)s:%(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[logging.FileHandler(config.path + '/data/prep.log', mode='w')])
+    handlers=[logging.FileHandler(config.path + '/data/prep.log', mode='w'), TqdmLoggingHandler()])
 
 logging.info('reading data...')
 train = pd.read_csv(config.path+'/data/train.tsv', sep='\t', quoting=3, header=None)

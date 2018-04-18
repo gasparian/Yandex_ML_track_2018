@@ -1,12 +1,15 @@
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import logging
 
 from sklearn.linear_model import SGDRegressor
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.base import ClassifierMixin, clone
 from lightgbm import LGBMRegressor
 from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
+from sklearn.metrics import mean_squared_error
 
 
 class TqdmLoggingHandler(logging.Handler):
@@ -39,12 +42,20 @@ def ndcg_at_k(r, k=3, method=0):
         return 0.
     return dcg_at_k(r, k, method) / dcg_max 
 
-def make_prediction(df, test_data, model):
+def make_prediction(df, test_data, model, loss=False):
     prediction = pd.DataFrame()
     prediction['context_id'] = df['0']
     prediction['reply_id'] = df['4']
     prediction['rank'] = - model.predict(test_data)
     prediction = prediction.sort_values(by=['context_id', 'rank'])[['context_id', 'reply_id']]
+    if loss:
+        score = 0
+        uniques = prediction['context_id'].unique()
+        for Id in uniques:
+            tmp = prediction[prediction['context_id'] == Id]['reply_id'].values.tolist()
+            score += ndcg_at_k(tmp, len(set(tmp))) / len(uniques)
+        score *= 100000
+        return score
     return prediction
 
 def weighter(tfidf_data, tfidf, new_skipgram_ru, col):
@@ -74,6 +85,7 @@ class EarlyStopping(ClassifierMixin):
         estimator = clone(self.estimator)
         estimator.n_estimators = 1
         estimator.warm_start = True
+        estimator.n_jobs = -1
         return estimator
     
     def fit(self, X, y):
@@ -83,6 +95,7 @@ class EarlyStopping(ClassifierMixin):
 
         for n_est in range(1, self.max_n_estimators+1):
             est.n_estimators = n_est
+            estimator.n_jobs = -1
             est.fit(X,y)
             
             score = self.scorer(est)
@@ -95,14 +108,14 @@ class EarlyStopping(ClassifierMixin):
 
         return self
 
-def es_scorer(X, y, est, scorer):
+def es_scorer(X, y, est):
     pred = est.predict(X)
-    return scorer(y, pred)
+    return mean_squared_error(y, pred)
 
 def get_model_(key, params=None):
 
     models_list = {
-            'lr': SGDRegressor(loss='squared_loss', penalty='l2', alpha=0.0001, l1_ratio=0.15),
+            'lr': SGDRegressor(),
             'xgb': XGBRegressor(n_estimators=1000),
             'rf': RandomForestRegressor(n_estimators=1000),
             'lgbm': LGBMRegressor(n_estimators=1000)

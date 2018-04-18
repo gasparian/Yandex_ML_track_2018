@@ -16,8 +16,11 @@ from tqdm import tqdm
 import config
 from scripts import *
 
-path = config.path +'/data/'+os.path.basename(__file__)
-os.mkdir(path)
+path = config.path +'/data/'+os.path.basename(__file__).split('.')[0]
+try:
+    os.mkdir(path)
+except:
+    pass
 from shutil import copyfile
 copyfile(config.path+'/config.py', path+'/config.py')
 

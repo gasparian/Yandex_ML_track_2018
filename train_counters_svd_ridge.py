@@ -11,15 +11,18 @@ from sklearn.model_selection import KFold
 import config
 from scripts import *
 
-path = config.path +'/data/'+os.path.basename(__file__)
-os.mkdir(path)
+path = config.path +'/data/'+os.path.basename(__file__).split('.')[0]
+try:
+    os.mkdir(path)
+except:
+    pass
 from shutil import copyfile
 copyfile(config.path+'/config.py', path+'/config.py')
 
 logging.basicConfig(level=logging.DEBUG,
     format='%(asctime)s:%(name)s:%(levelname)s:%(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[logging.FileHandler(path + '/train.log', mode='w')])
+    handlers=[logging.FileHandler(path + '/train.log', mode='w'), logging.StreamHandler()])
 
 train = pd.read_csv(config.path+'/data/train_modified.tsv', sep=' ', index_col=0)
 test = pd.read_csv(config.path+'/data/test_modified.tsv', sep=' ', index_col=0)
