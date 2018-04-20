@@ -10,6 +10,7 @@ from lightgbm import LGBMRegressor
 from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
 from sklearn.metrics import mean_squared_error
+import networkx as nx
 
 
 class TqdmLoggingHandler(logging.Handler):
@@ -70,53 +71,11 @@ def weighter(tfidf_data, tfidf, new_skipgram_ru, col):
         new_tfidf_data[i, :] = np.dot(tfidf_data[i, idxes].todense(), new_skipgram_ru[idxes])
     return new_tfidf_data
 
-class EarlyStopping(ClassifierMixin):
-    def __init__(self, estimator, max_n_estimators, scorer,
-                 n_min_iterations=50, scale=1.02):
-
-        self.estimator = estimator
-        self.max_n_estimators = max_n_estimators
-        self.scorer = scorer
-        self.scale = scale
-        self.n_min_iterations = n_min_iterations
-    
-    def _make_estimator(self, append=True):
-
-        estimator = clone(self.estimator)
-        estimator.n_estimators = 1
-        estimator.warm_start = True
-        estimator.n_jobs = -1
-        return estimator
-    
-    def fit(self, X, y):
-
-        est = self._make_estimator()
-        self.scores_ = []
-
-        for n_est in range(1, self.max_n_estimators+1):
-            est.n_estimators = n_est
-            estimator.n_jobs = -1
-            est.fit(X,y)
-            
-            score = self.scorer(est)
-            self.estimator_ = est
-            self.scores_.append(score)
-
-            if (n_est > self.n_min_iterations and
-                score > self.scale*np.min(self.scores_)):
-                return self
-
-        return self
-
-def es_scorer(X, y, est):
-    pred = est.predict(X)
-    return mean_squared_error(y, pred)
-
 def get_model_(key, params=None):
 
     models_list = {
             'lr': SGDRegressor(),
-            'xgb': XGBRegressor(n_estimators=1000),
+            'xgb': XGBRegressor(tree_method='hist', n_estimators=1000, n_jobs=4),
             'rf': RandomForestRegressor(n_estimators=1000),
             'lgbm': LGBMRegressor(n_estimators=1000)
         }
@@ -127,3 +86,25 @@ def get_model_(key, params=None):
     else:
         if params is not None:
             return models_list[key].set_params(**params)
+
+def pagerank(text, tfidf):
+    preprocessor = tfidf.build_preprocessor()
+    analyzer = tfidf.build_analyzer()
+    F = {}
+    corpus = preprocessor(text)
+    for line in corpus:
+        line = analyzer(line)
+        for i in range(len(line)-1):
+            ai, aj = line[i], line[i+1]
+            if ai not in F:
+                F[ai] = {}
+            if aj not in F[ai]:
+                F[ai][aj] = 0
+            F[ai][aj] += 1
+
+    G_all = nx.Graph()
+    for ai in F:
+        for aj in F[ai]:
+            G_all.add_edge(str(ai), str(aj))
+    pr_all = nx.pagerank(G_all, alpha=0.85)
+    return pd.DataFrame.from_dict(pr_all, orient='index')

@@ -6,7 +6,7 @@ from functools import partial
 from itertools import combinations
 from shutil import copyfile
 
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
 from sklearn import pipeline
 from sklearn.model_selection import KFold
@@ -38,8 +38,8 @@ counters_pipe = pipeline.FeatureUnion(
     n_jobs = -1,
     transformer_list = [
     ('chars_features', pipeline.Pipeline([
-        ('chars_counter', CountVectorizer(
-            analyzer=u'char', ngram_range=(2, 4), tokenizer=None,
+        ('chars_counter', TfidfVectorizer(
+            analyzer=u'char', ngram_range=(2, 5), tokenizer=None,
             max_features=config.max_features, strip_accents=None, max_df=0.9, min_df=2, lowercase=False)),
         ('chars_tsvd', TruncatedSVD(n_components=config.svd_n_components, n_iter=25, random_state=42))])),
     ('words_features', pipeline.Pipeline([
@@ -184,7 +184,7 @@ for train_index, test_index in cv.split(train):
 
 logging.info('averaged cv loss: loss = %s' % (cv_loss))
 
-pickle.dump(models, open(path+'/blend_svd.pickle.dat', 'wb'))
+pickle.dump(models, open(path+'/blend_all_tfidf_svd.pickle.dat', 'wb'))
 logging.info('Models saved!')
 
 prediction = pd.DataFrame()
@@ -216,6 +216,7 @@ for fold in range(nfolds):
 
 logging.info('Hold out test - predicted!')
 prediction = prediction.sort_values(by=['context_id', 'rank'])
-prediction[['context_id', 'reply_id']].to_csv(path+'/sub_blend_svd.tsv',header=None, index=False, sep=' ')
-prediction.to_csv(path+'/sub_rank_blend_svd.tsv', sep=' ')
+prediction[['context_id', 'reply_id']].to_csv(path+'/sub_all_tfidf_blend_svd.tsv',header=None, index=False, sep=' ')
+
+prediction.to_csv(path+'/sub_rank_all_tfidf_blend_svd.tsv', sep=' ')
 logging.info('Submission saved!')

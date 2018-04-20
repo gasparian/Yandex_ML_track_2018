@@ -6,11 +6,13 @@ from functools import partial
 from itertools import combinations
 from shutil import copyfile
 
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.decomposition import TruncatedSVD
 from sklearn import pipeline
 from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error
+from scipy.sparse import hstack
 
 import config
 from scripts import *
@@ -34,32 +36,52 @@ test = pd.read_csv(config.path+'/data/test_modified.tsv', sep=' ', index_col=0)
 train.fillna('', inplace=True)
 test.fillna('', inplace=True)
 
-counters_pipe = pipeline.FeatureUnion(
-    n_jobs = -1,
-    transformer_list = [
-    ('chars_features', pipeline.Pipeline([
-        ('chars_counter', CountVectorizer(
-            analyzer=u'char', ngram_range=(2, 4), tokenizer=None,
-            max_features=config.max_features, strip_accents=None, max_df=0.9, min_df=2, lowercase=False)),
-        ('chars_tsvd', TruncatedSVD(n_components=config.svd_n_components, n_iter=25, random_state=42))])),
-    ('words_features', pipeline.Pipeline([
-        ('words_counter', TfidfVectorizer(
+chars_counter = TfidfVectorizer(
+            analyzer=u'char', ngram_range=(2, 5), tokenizer=None,
+            max_features=config.max_features, strip_accents=None, max_df=0.9, min_df=2, lowercase=False)
+chars_tsvd = TruncatedSVD(n_components=config.svd_n_components, n_iter=25, random_state=42)
+
+words_tfidf = TfidfVectorizer(
        analyzer=u'word', ngram_range=(1, 3), tokenizer=None, use_idf=True,
-       max_features=config.max_features, strip_accents=None, max_df=0.9, min_df=2, lowercase=False)),
-        ('words_tsvd', TruncatedSVD(n_components=config.svd_n_components, n_iter=25, random_state=42))])),
-])
+       max_features=config.max_features, strip_accents=None, max_df=0.9, min_df=2, lowercase=False)
+words_tsvd = TruncatedSVD(n_components=config.svd_n_components, n_iter=25, random_state=42)
 
 nfolds = round(len(train) / len(test))
 cv = KFold(n_splits=nfolds, shuffle=True, random_state=42)
 
 fold, cv_loss = 0, 0
-models = {i:{'counter':counters_pipe, 'model':{key:get_model_(key, params=params) for key, params in config.blend.items()}, 'pred':{}, 'loss':{}, 'ndcg':{}} for i in range(nfolds)}
+models = {
+    i:{'counter':{'chars_counter':chars_counter, 'chars_tsvd':chars_tsvd, 'words_tfidf':words_tfidf, 'words_tsvd':words_tsvd, 
+       'pagerank':{'scaler':MinMaxScaler(feature_range=(0, 1), copy=False)}, 'words_tfidf_scaler':StandardScaler(copy=False, with_mean=False, with_std=True)}, 
+    'model':{key:get_model_(key, params=params) for key, params in config.blend.items()}, 
+    'pred':{}, 'loss':{}, 'ndcg':{}} for i in range(nfolds)
+}
 
 for train_index, test_index in cv.split(train):
     logging.info('make features...')
-    models[fold]['counter'].fit(np.hstack([train[str(col)].loc[train_index] for col in config.text_cols]))
-    train_data = np.hstack([models[fold]['counter'].transform(train[str(col)].loc[train_index]) for col in config.text_cols])
-    test_data = np.hstack([models[fold]['counter'].transform(train[str(col)].loc[test_index]) for col in config.text_cols])
+
+    train_chars_data = models[fold]['counter']['chars_counter'].fit_transform(np.hstack([train[str(col)].loc[train_index] for col in config.text_cols])) 
+    train_chars_data = models[fold]['counter']['chars_tsvd'].fit_transform(train_chars_data)
+
+    train_words_data = models[fold]['counter']['words_tfidf'].fit_transform(np.hstack([train[str(col)].loc[train_index] for col in config.text_cols]))
+    vocab = pd.DataFrame.from_dict(dict(sorted(models[fold]['counter']['words_tfidf'].vocabulary_.items(), key=operator.itemgetter(1), reverse=False)), orient='index')
+    weights = pagerank(np.hstack([train[str(col)].loc[train_index] for col in config.text_cols]), models[fold]['counter']['words_tfidf']).reindex(vocab.index).fillna(0).values
+    models[fold]['counter']['pagerank']['ranker'] = models[fold]['counter']['pagerank']['scaler'].fit_transform(weights.T)
+    train_words_data = models[fold]['counter']['pagerank']['words_tfidf_scaler'].fit_transform(train_words_data.multiply(models[fold]['counter']['pagerank']['ranker']))
+
+    train_words_data = models[fold]['counter']['words_tsvd'].fit_transform(train_words_data)
+    train_data = np.hstack([train_chars_data, train_words_data])
+    del train_chars_data; del train_words_data
+
+    test_chars_data = models[fold]['counter']['chars_counter'].transform(np.hstack([train[str(col)].loc[test_index] for col in config.text_cols]))
+    test_chars_data = models[fold]['counter']['chars_tsvd'].transform(test_chars_data)
+
+    test_words_data = models[fold]['counter']['words_tfidf'].transform(np.hstack([train[str(col)].loc[test_index] for col in config.text_cols]))
+    test_words_data = models[fold]['counter']['pagerank']['words_tfidf_scaler'].transform(test_words_data.multiply(models[fold]['counter']['pagerank']['ranker']))
+
+    test_words_data = models[fold]['counter']['words_tsvd'].transform(test_words_data)
+    test_data = np.hstack([test_chars_data, test_words_data])
+    del test_chars_data; del test_words_data
 
     logging.info(train_data.shape)
     logging.info(test_data.shape)
@@ -184,7 +206,7 @@ for train_index, test_index in cv.split(train):
 
 logging.info('averaged cv loss: loss = %s' % (cv_loss))
 
-pickle.dump(models, open(path+'/blend_svd.pickle.dat', 'wb'))
+pickle.dump(models, open(path+'/blend_svd_pagerank.pickle.dat', 'wb'))
 logging.info('Models saved!')
 
 prediction = pd.DataFrame()
@@ -194,7 +216,16 @@ prediction['rank'] = 0
 
 logging.info('Predicting on hold out test...')
 for fold in range(nfolds):
-    hold_out_test_data = np.hstack([models[fold]['counter'].transform(test[str(col)]) for col in config.text_cols])
+    test_chars_data = models[fold]['counter']['chars_counter'].transform(np.hstack([test[str(col)] for col in config.text_cols]))
+    test_chars_data = models[fold]['counter']['chars_tsvd'].transform(test_chars_data)
+
+    test_words_data = models[fold]['counter']['words_tfidf'].transform(np.hstack([test[str(col)] for col in config.text_cols]))
+    test_words_data = models[fold]['counter']['pagerank']['words_tfidf_scaler'].transform(test_words_data.multiply(models[fold]['counter']['pagerank']['ranker']))
+
+    test_words_data = models[fold]['counter']['words_tsvd'].transform(test_words_data)
+    hold_out_test_data = np.hstack([test_chars_data, test_words_data])
+    del test_chars_data; del test_words_data
+
     if models[fold]['best'] == 'averaged':
         if models[fold]['mode'] == 'mean':
             scores = np.ones((hold_out_test_data.shape[0]))
@@ -212,10 +243,12 @@ for fold in range(nfolds):
             scores = len(models[fold]['model'])/scores
     else:
         scores = models[fold]['model'].predict(hold_out_test_data)
-    prediction['rank'] += - scores / nfolds
+    prediction['rank'] += scores / nfolds
 
 logging.info('Hold out test - predicted!')
 prediction = prediction.sort_values(by=['context_id', 'rank'])
 prediction[['context_id', 'reply_id']].to_csv(path+'/sub_blend_svd.tsv',header=None, index=False, sep=' ')
-prediction.to_csv(path+'/sub_rank_blend_svd.tsv', sep=' ')
+
+prediction.to_csv(path+'/sub_rank_blend_svd_pagerank.tsv', sep=' ')
+pickle.dump(models, open(path+'/blend_svd_pagerank.pickle.dat', 'wb'))
 logging.info('Submission saved!')
