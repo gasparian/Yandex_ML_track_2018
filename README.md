@@ -1,4 +1,4 @@
-# Yandex_ML_track_2018
+# Yandex_ML_track_2018 (29th place)
 
 ### Problem:
   Predict the most relevant reply to the context. Context usually consists of 3 replicas with several replies. Each replica has relevance and confidense - let use it's product as target variable.
