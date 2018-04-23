@@ -1,17 +1,12 @@
 import pickle
 import logging
 import os
-import operator
 
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.decomposition import TruncatedSVD
-from sklearn import pipeline
 from lightgbm import LGBMRegressor
 from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 import config
-from scripts import *
 
 path = config.path +'/data/'+os.path.basename(__file__).split('.')[0]
 try:

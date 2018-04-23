@@ -1,0 +1,6 @@
+declare -a arr=("1" "2" "3" "5")
+for i in "${arr[@]}";
+do
+     ./fasttext print-sentence-vectors /home/jupyter/ML_track/models/cc.ru.300.bin < /home/jupyter/ML_track/data/train_text_$i.txt > /home/jupyter/ML_track/data/train_text_$i_vectors.txt
+    ./fasttext print-sentence-vectors /home/jupyter/ML_track/models/cc.ru.300.bin < /home/jupyter/ML_track/data/test_text_$i.txt > /home/jupyter/ML_track/data/test_text_$i_vectors.txt
+done   
