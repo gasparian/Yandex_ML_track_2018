@@ -4,7 +4,7 @@
 
 ### Problem:
 
-  Predict the most relevant reply to the context. Context usually consists of 3 replicas with several replies. Each reply has relevance and confidence - let use it's product as target variable.
+  Predict the most relevant reply according the context. Context usually consists of 3 replicas with several replies. Each reply has relevance and confidence - I use it's product as a target variable.
   
 ### Solution:
   Use pretrained fastText model to represent each sequence as concatenated replicas embeddings and match it all with target. Let's create KFold cross-validation with 10 folds, train separate simple lightgbm regressor on every iteration and then calculate mean of all models predictions to make result more "stable".
