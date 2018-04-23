@@ -2,16 +2,53 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import logging
-
 from sklearn.linear_model import SGDRegressor
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.base import ClassifierMixin, clone
-from lightgbm import LGBMRegressor
-from xgboost import XGBRegressor
-from catboost import CatBoostRegressor
 from sklearn.metrics import mean_squared_error
-import networkx as nx
 
+# from sklearn.ensemble import RandomForestRegressor
+# from sklearn.base import ClassifierMixin, clone
+# from lightgbm import LGBMRegressor
+# from xgboost import XGBRegressor
+# from catboost import CatBoostRegressor
+# import networkx as nx
+
+# def get_model_(key, params=None):
+
+#     models_list = {
+#             'lr': SGDRegressor(),
+#             'xgb': XGBRegressor(tree_method='hist', n_estimators=1000, n_jobs=4),
+#             'rf': RandomForestRegressor(n_estimators=1000),
+#             'lgbm': LGBMRegressor(n_estimators=1000)
+#         }
+
+#     if key == 'cat':
+#         if params is not None:
+#             return CatBoostRegressor(**params)
+#     else:
+#         if params is not None:
+#             return models_list[key].set_params(**params)
+
+# def pagerank(text, tfidf):
+#     preprocessor = tfidf.build_preprocessor()
+#     analyzer = tfidf.build_analyzer()
+#     F = {}
+#     corpus = preprocessor(text)
+#     for line in corpus:
+#         line = analyzer(line)
+#         for i in range(len(line)-1):
+#             ai, aj = line[i], line[i+1]
+#             if ai not in F:
+#                 F[ai] = {}
+#             if aj not in F[ai]:
+#                 F[ai][aj] = 0
+#             F[ai][aj] += 1
+
+#     G_all = nx.Graph()
+#     for ai in F:
+#         for aj in F[ai]:
+#             G_all.add_edge(str(ai), str(aj))
+#     pr_all = nx.pagerank(G_all, alpha=0.85)
+#     return pd.DataFrame.from_dict(pr_all, orient='index')
 
 class TqdmLoggingHandler(logging.Handler):
 
@@ -70,41 +107,3 @@ def weighter(tfidf_data, tfidf, new_skipgram_ru, col):
         idxes = np.where(tfidf_data[i].todense())[1]
         new_tfidf_data[i, :] = np.dot(tfidf_data[i, idxes].todense(), new_skipgram_ru[idxes])
     return new_tfidf_data
-
-def get_model_(key, params=None):
-
-    models_list = {
-            'lr': SGDRegressor(),
-            'xgb': XGBRegressor(tree_method='hist', n_estimators=1000, n_jobs=4),
-            'rf': RandomForestRegressor(n_estimators=1000),
-            'lgbm': LGBMRegressor(n_estimators=1000)
-        }
-
-    if key == 'cat':
-        if params is not None:
-            return CatBoostRegressor(**params)
-    else:
-        if params is not None:
-            return models_list[key].set_params(**params)
-
-def pagerank(text, tfidf):
-    preprocessor = tfidf.build_preprocessor()
-    analyzer = tfidf.build_analyzer()
-    F = {}
-    corpus = preprocessor(text)
-    for line in corpus:
-        line = analyzer(line)
-        for i in range(len(line)-1):
-            ai, aj = line[i], line[i+1]
-            if ai not in F:
-                F[ai] = {}
-            if aj not in F[ai]:
-                F[ai][aj] = 0
-            F[ai][aj] += 1
-
-    G_all = nx.Graph()
-    for ai in F:
-        for aj in F[ai]:
-            G_all.add_edge(str(ai), str(aj))
-    pr_all = nx.pagerank(G_all, alpha=0.85)
-    return pd.DataFrame.from_dict(pr_all, orient='index')
