@@ -1,6 +1,9 @@
-# Yandex_ML_track_2018 (29th place)
+# [Yandex_ML_track_2018](https://contest.yandex.ru/algorithm2018/contest/7914/problems/)
+
+### Result: 29th place, mean NDCG x 100000 = 85352 
 
 ### Problem:
+
   Predict the most relevant reply to the context. Context usually consists of 3 replicas with several replies. Each replica has relevance and confidense - let use it's product as target variable.
   
 ### Solution:
