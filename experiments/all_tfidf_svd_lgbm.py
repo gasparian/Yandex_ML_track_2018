@@ -8,6 +8,7 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn import pipeline
 from lightgbm import LGBMRegressor
 from sklearn.model_selection import KFold
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 import config
 from scripts import *
@@ -31,33 +32,17 @@ test = pd.read_csv(config.path+'/data/test_modified.tsv', sep=' ', index_col=0)
 train.fillna('', inplace=True)
 test.fillna('', inplace=True)
 
-counters_pipe = pipeline.FeatureUnion(
-    n_jobs = -1,
-    transformer_list = [
-    ('chars_features', pipeline.Pipeline([
-        ('chars_counter', TfidfVectorizer(
-            analyzer=u'char', ngram_range=(2, 5), tokenizer=None,
-            max_features=config.max_features, strip_accents=None, max_df=0.9, min_df=2, lowercase=False)),
-        ('chars_tsvd', TruncatedSVD(n_components=config.svd_n_components, n_iter=25, random_state=42))])),
-    ('words_features', pipeline.Pipeline([
-        ('words_counter', TfidfVectorizer(
-       analyzer=u'word', ngram_range=(1, 3), tokenizer=None, use_idf=True,
-       max_features=config.max_features, strip_accents=None, max_df=0.9, min_df=2, lowercase=False)),
-        ('words_tsvd', TruncatedSVD(n_components=config.svd_n_components, n_iter=25, random_state=42))])),
-])
+prep = pickle.load(open(config.features_path+'/all_tfidf_svd.pickle.dat', 'rb'))
+splits = pickle.load(open(config.features_path+'/all_tfidf_svd_splits.pickle.dat', 'rb'))
+lgbm = LGBMRegressor(**config.params)
 
-nfolds = round(len(train) / len(test))
-lgbm = LGBMRegressor(n_estimators=500, n_jobs=-1)
-cv = KFold(n_splits=nfolds, shuffle=True, random_state=42)
+fold, cv_score, cv_mse, cv_mae = 0, 0, 0, 0
+models = {k:{'counter':v, 'model':lgbm} for k, v in prep.items()}
 
-fold, cv_score = 0, 0
-models = {i:{'counter':counters_pipe, 'model':lgbm} for i in range(nfolds)}
-
-for train_index, test_index in cv.split(train):
+for train_index, test_index in splits:
     logging.info('make features...')
-    models[fold]['counter'].fit(np.hstack([train[str(col)].loc[train_index] for col in config.text_cols]))
-    train_data = np.hstack([models[fold]['counter'].transform(train[str(col)].loc[train_index]) for col in config.text_cols])
-    test_data = np.hstack([models[fold]['counter'].transform(train[str(col)].loc[test_index]) for col in config.text_cols])
+    train_data = pickle.load(open(config.features_path+'/train_fold_%i.pickle.dat' % fold, 'rb'))
+    test_data = pickle.load(open(config.features_path+'/test_fold_%i.pickle.dat' % fold, 'rb'))
 
     logging.info(train_data.shape)
     logging.info(test_data.shape)
@@ -72,27 +57,36 @@ for train_index, test_index in cv.split(train):
         models[fold]['model'].fit(train_data, train['target'].loc[train_index])
 
     logging.info('make prediction...')
+    mse = mean_squared_error(train['target'].loc[test_index], models[fold]['model'].predict(test_data))
+    mae = mean_absolute_error(train['target'].loc[test_index], models[fold]['model'].predict(test_data))
+    cv_mse += mse / config.nfolds
+    cv_mae += mae / config.nfolds
+
     prediction = make_prediction(train.loc[test_index], test_data, models[fold]['model'])
-    
     score = 0
     uniques = prediction['context_id'].unique()
     for Id in uniques:
         tmp = prediction[prediction['context_id'] == Id]['reply_id'].values.tolist()
         score += ndcg_at_k(tmp, len(set(tmp))) / len(uniques)
     score *= 100000
-    cv_score += score / nfolds
+    cv_score += score / config.nfolds
     
-    logging.info('fold#%i: ndcg = %i' % (fold, int(score)))
+    mse_train = mean_squared_error(train['target'].loc[train_index], models[fold]['model'].predict(train_data))
+    mae_train = mean_absolute_error(train['target'].loc[train_index], models[fold]['model'].predict(train_data))
+    
+    logging.info('fold#%i: ndcg = %i; mse = %s(%s); mae = %s(%s)' % (fold, int(score), mse, mse_train, mae, mae_train))
     fold += 1
-logging.info('averaged cv score: ndcg = %i' % (int(cv_score)))
+    del train_data; del test_data
+
+logging.info('averaged cv score: ndcg = %i; mse = %s; mae = %s' % (int(cv_score), cv_mse, cv_mae))
 
 prediction = pd.DataFrame()
 prediction['context_id'] = test['0']
 prediction['reply_id'] = test['4']
 prediction['rank'] = 0
-for fold in range(nfolds):
-    hold_out_test_data = np.hstack([models[fold]['counter'].transform(test[str(col)]) for col in config.text_cols])
-    prediction['rank'] += - models[fold]['model'].predict(hold_out_test_data) / nfolds
+for fold in range(config.nfolds):
+    hold_out_test_data = pickle.load(open(config.features_path+'/hold_test_fold_%i.pickle.dat' % fold, 'rb'))
+    prediction['rank'] += - models[fold]['model'].predict(hold_out_test_data) / config.nfolds
 prediction = prediction.sort_values(by=['context_id', 'rank'])
 prediction[['context_id', 'reply_id']].to_csv(path+'/sub_svd_counter_all_tfidf_lgbm.tsv',header=None, index=False, sep=' ')
 prediction.to_csv(path+'/sub_rank_svd_counter_all_tfidf_lgbm.tsv', sep=' ')

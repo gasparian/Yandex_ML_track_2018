@@ -54,7 +54,7 @@ def make_prediction(df, test_data, model, loss=False):
         uniques = prediction['context_id'].unique()
         for Id in uniques:
             tmp = prediction[prediction['context_id'] == Id]['reply_id'].values.tolist()
-            score += ndcg_at_k(tmp, len(set(tmp))) / len(uniques)
+            score += ndcg_at_k(tmp, k=3) / len(uniques)
         score *= 100000
         return score
     return prediction
