@@ -7,7 +7,7 @@
   Predict the most relevant reply to the context. Context usually consists of 3 replicas with several replies. Each replica has relevance and confidense - let use it's product as target variable.
   
 ### Solution:
-  Use pretrained fastText model to represent each sequence as a concatenated replicas embeddings and match it all with target. Let's create KFold cross-validation with 10 splits, train separate lightgbm regressor on every iteration and then calculate mean of all models predictions to make result more "stable".
+  Use pretrained fastText model to represent each sequence as a concatenated replicas embeddings and match it all with target. Let's create KFold cross-validation with 10 folds, train separate lightgbm regressor on every iteration and then calculate mean of all models predictions to make result more "stable".
   
 ### Pipeline:
  - Install [requirements.txt](https://github.com/gasparian/Yandex_ML_track_2018/blob/master/requirements.txt) `pip3 install -r requirements.txt`
