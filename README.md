@@ -4,7 +4,7 @@
   Predict the most relevant reply to the context. Context usually consists of 3 replicas with several replies. Each replica has relevance and confidense - let use it's product as target variable.
   
 ### Solution:
-  Use pretrained fastText model to represent each sequence as a concatenated embeddings of replicas and match all with target.
+  Use pretrained fastText model to represent each sequence as a concatenated embeddings of replicas and match it all with target.
   
 ### Pipeline:
  - Install [requirements.txt](https://github.com/gasparian/Yandex_ML_track_2018/blob/master/requirements.txt) `pip3 install -r requirements.txt`
