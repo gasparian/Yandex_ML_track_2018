@@ -1,3 +1,0 @@
-python3.6 fasttext_lgbm.py
-python3.6 all_tfidf_svd_fasttext_lgbm.py
-python3.6 all_tfidf_svd_lgbm.py
