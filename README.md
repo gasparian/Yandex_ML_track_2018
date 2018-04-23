@@ -9,7 +9,7 @@
 ### Pipeline:
  - Install [requirements.txt](https://github.com/gasparian/Yandex_ML_track_2018/blob/master/requirements.txt) `pip3 install -r requirements.txt`
  - Change paths in [config.py](https://github.com/gasparian/Yandex_ML_track_2018/blob/master/config.py) and then run `python3 prep.py` 
- - Install [fastText](https://github.com/facebookresearch/fastText) and build it using make.
+ - Download [fastText](https://github.com/facebookresearch/fastText) and build it using make.
  - Download [fastText model](https://fasttext.cc/docs/en/crawl-vectors.html) trained on wikipedia and common crawl.
  - Fill [get_vectors.txt](https://github.com/gasparian/Yandex_ML_track_2018/blob/master/get_vectors.txt) with needed paths and copy it to the fastText folder.
  - Run `bash get_vectors.txt`
