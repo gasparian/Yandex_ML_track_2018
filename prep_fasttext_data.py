@@ -21,22 +21,7 @@ for col in config.text_cols:
         i = 0
         for line in tqdm(f, ascii=True, desc='train; column#%i' % col):
             splitted = line.split()
-            try:
-                array = np.array(splitted).astype(float)[np.newaxis, :]
-                if array.shape[1] > 300:
-                    array = array[:, array.shape[1]-300:]
-            except:
-                for j, w in enumerate(splitted):
-                    try:
-                        int(w)
-                    except:
-                        try:
-                            float(w)
-                            break
-                        except:
-                            pass
-                array = np.array(splitted[j:]).astype(float)[np.newaxis, :]
-            df[i, :] = array
+            df[i, :] = np.array(splitted[-300:]).astype(float)[np.newaxis, :]
             i += 1
     pickle.dump(df, open(config.path+'/data/train_text_%i_vectors.pickle.dat' % col, 'wb'))
 
@@ -46,22 +31,7 @@ for col in config.text_cols:
         i = 0
         for line in tqdm(f, ascii=True, desc='test; column#%i' % col):
             splitted = line.split()
-            try:
-                array = np.array(splitted).astype(float)[np.newaxis, :]
-                if array.shape[1] > 300:
-                    array = array[:, array.shape[1]-300:]
-            except:
-                for j, w in enumerate(splitted):
-                    try:
-                        int(w)
-                    except:
-                        try:
-                            float(w)
-                            break
-                        except:
-                            pass
-                array = np.array(splitted[j:]).astype(float)[np.newaxis, :]
-            df[i, :] = array
+            df[i, :] = np.array(splitted[-300:]).astype(float)[np.newaxis, :]
             i += 1
     pickle.dump(df, open(config.path+'/data/test_text_%i_vectors.pickle.dat' % col, 'wb'))
 logging.info('Finished!')
