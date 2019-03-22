@@ -7,6 +7,7 @@ from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 import config
+from scripts import *
 
 path = config.path +'/data/'+os.path.basename(__file__).split('.')[0]
 try:
