@@ -48,10 +48,8 @@ params = {
     'max_bin':256
 }
 
-lgbm = LGBMRegressor(**params)
-
 fold, cv_score, cv_mse, cv_mae = 0, 0, 0, 0
-models = {i:{'model':lgbm} for i in range(config.nfolds)}
+models = {i:LGBMRegressor(**params) for i in range(config.nfolds)}
 
 for train_index, test_index in splits:
 
@@ -60,20 +58,20 @@ for train_index, test_index in splits:
     
     logging.info('fitting model...')
     if config.early_stopping:
-        models[fold]['model'].fit(train_fasttext[train_index], train['target'].loc[train_index],
+        models[fold].fit(train_fasttext[train_index], train['target'].loc[train_index],
                             eval_set=[(train_fasttext[test_index], train['target'].loc[test_index])],
                             eval_metric='l2', verbose=False,
                             early_stopping_rounds=config.num_round)
     else:
-        models[fold]['model'].fit(train_fasttext[train_index], train['target'].loc[train_index])    
+        models[fold].fit(train_fasttext[train_index], train['target'].loc[train_index])
 
     logging.info('make prediction...')
-    mse = mean_squared_error(train['target'].loc[test_index], models[fold]['model'].predict(train_fasttext[test_index]))
-    mae = mean_absolute_error(train['target'].loc[test_index], models[fold]['model'].predict(train_fasttext[test_index]))
+    mse = mean_squared_error(train['target'].loc[test_index], models[fold].predict(train_fasttext[test_index]))
+    mae = mean_absolute_error(train['target'].loc[test_index], models[fold].predict(train_fasttext[test_index]))
     cv_mse += mse / config.nfolds
     cv_mae += mae / config.nfolds
 
-    prediction = make_prediction(train.loc[test_index], train_fasttext[test_index], models[fold]['model'])
+    prediction = make_prediction(train.loc[test_index], train_fasttext[test_index], models[fold])
     score = 0
     uniques = prediction['context_id'].unique()
     for Id in uniques:
@@ -82,8 +80,8 @@ for train_index, test_index in splits:
     score *= 100000
     cv_score += score / config.nfolds
 
-    mse_train = mean_squared_error(train['target'].loc[train_index], models[fold]['model'].predict(train_fasttext[train_index]))
-    mae_train = mean_absolute_error(train['target'].loc[train_index], models[fold]['model'].predict(train_fasttext[train_index]))
+    mse_train = mean_squared_error(train['target'].loc[train_index], models[fold].predict(train_fasttext[train_index]))
+    mae_train = mean_absolute_error(train['target'].loc[train_index], models[fold].predict(train_fasttext[train_index]))
     
     logging.info('fold#%i: ndcg = %i; mse = %s(%s); mae = %s(%s)' % (fold, int(score), mse, mse_train, mae, mae_train))
     fold += 1
@@ -95,7 +93,7 @@ prediction['context_id'] = test['0']
 prediction['reply_id'] = test['4']
 prediction['rank'] = 0
 for fold in range(config.nfolds):
-    prediction['rank'] += - models[fold]['model'].predict(test_fasttext) / config.nfolds
+    prediction['rank'] += - models[fold].predict(test_fasttext) / config.nfolds
 prediction = prediction.sort_values(by=['context_id', 'rank'])
 prediction[['context_id', 'reply_id']].to_csv(path+'/sub_fasttext_lgbm.tsv',header=None, index=False, sep=' ')
 prediction.to_csv(path+'/sub_rank_fasttext_lgbm.tsv', sep=' ')
